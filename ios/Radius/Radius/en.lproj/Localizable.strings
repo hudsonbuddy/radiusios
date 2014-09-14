@@ -1,0 +1,9 @@
+// Push notification format strings
+
+"NOTIFICATION_COMMENT_YOURS" = "%@ commented on your post at %@";
+
+"NOTIFICATION_COMMENT_ALSO" = "%@ also commented on a post at %@";
+
+"NOTIFICATION_CONVO_REPLY" = "%@ replied to your conversation post at %@";
+
+"NOTIFICATION_BEACON_INVITE" = "%@ invited you to check out %@";

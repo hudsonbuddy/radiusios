@@ -1,0 +1,518 @@
+//
+//  NewsFeedViewController.m
+//  Radius
+//
+//  Created by Fred Ehrsam on 9/17/12.
+//
+//
+
+#import "NewsFeedViewController.h"
+#import "RadiusRequest.h"
+#import "DateAndTimeHelper.h"
+#import "BeaconContentViewController2.h"
+#import "RadiusEvent.h"
+#import "MFSlidingView.h"
+#import "PopupView.h"
+
+@interface NewsFeedViewController() {
+    BOOL isLoadingMore;
+    BOOL reachedBottom;
+    
+    RadiusRequest *lastRequest;
+    UIView *loadingView;
+    
+    NSInteger totalRequested;
+}
+
+@property NSMutableArray *newsFeedDataArray;
+@end
+
+@implementation NewsFeedViewController
+@synthesize allButton, followedButton, nearbyButton, topButton;
+@synthesize feedTableView;
+@synthesize newsFeedDataArray;
+@synthesize locationManager;
+
+NSMutableDictionary *cache;
+NSMutableDictionary *imageCacheDictionary;
+
+NSString *currentFilter;
+
+- (id)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil
+{
+    self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil];
+    if (self)
+    {
+        // Custom initialization
+    }
+    return self;
+}
+
+- (void)viewDidLoad
+{
+    [super viewDidLoad];
+    [self setupTabButtons];
+    //self.view.backgroundColor = [[UIColor alloc] initWithPatternImage:[UIImage imageNamed:@"bck_GraphTexture_new.png"]];
+    
+    if(![CLLocationManager locationServicesEnabled]) {
+        [self setFollowedButtonSelected];
+        [self showNoLocationAlert];
+    }
+    
+    
+    locationManager = [[CLLocationManager alloc] init];
+    locationManager.delegate = self;
+    
+    [locationManager startUpdatingLocation];
+    
+    cache = [[NSMutableDictionary alloc] init];
+    
+    isLoadingMore = NO;
+}
+
+// For iOS < 6 compatibility
+-(void)locationManager:(CLLocationManager *)manager didUpdateToLocation:(CLLocation *)newLocation fromLocation:(CLLocation *)oldLocation {
+    [self setAllButtonSelected];
+    [locationManager stopUpdatingLocation];
+}
+
+-(void)locationManager:(CLLocationManager *)manager didUpdateLocations:(NSArray *)locations {
+    [self setAllButtonSelected];
+    [locationManager stopUpdatingLocation];
+}
+
+-(void)locationManager:(CLLocationManager *)manager didFailWithError:(NSError *)error {
+    [self setFollowedButtonSelected];
+    [locationManager stopUpdatingLocation];
+    [self showNoLocationAlert];
+}
+
+-(void)requestNewsFeedWithOffset:(NSUInteger)offset limit:(NSUInteger)limit completionHandler:(RadiusResponseHandler)completionHandler
+{
+    
+    totalRequested = offset+limit;
+    
+    NSString *currLat = [NSString stringWithFormat:@"%.8lf",locationManager.location.coordinate.latitude];
+    NSString *currLng = [NSString stringWithFormat:@"%.8lf",locationManager.location.coordinate.longitude];
+    
+    NSString *limitString = [NSString stringWithFormat:@"%d",limit];
+    NSString *offsetString = [NSString stringWithFormat:@"%d",offset];
+    RadiusRequest *radRequest = [RadiusRequest requestWithParameters:[NSDictionary dictionaryWithObjectsAndKeys:currentFilter, @"filter", currLat, @"lat", currLng, @"lng", offsetString,@"offset",limitString,@"limit", nil] apiMethod:@"me/news_feed"];
+    lastRequest = radRequest;
+    [radRequest startWithCompletionHandler:^(id result, RadiusError *error) {
+        if(radRequest==lastRequest) {
+            completionHandler(result,error);
+        }
+    }];
+
+}
+
+-(void)showLoadingView
+{
+    if(!loadingView) {
+        CGFloat height = 140;
+        CGFloat width = 250;
+        CGFloat topOffset = 120;
+        
+        loadingView = [[UIView alloc] initWithFrame:CGRectMake(feedTableView.frame.size.width/2-width/2,
+                                                               topOffset,
+                                                               width,
+                                                               height)];
+        loadingView.layer.cornerRadius = 5;
+        loadingView.layer.backgroundColor = [[UIColor colorWithRed:0 green:0 blue:0 alpha:0.5] CGColor];
+        
+        UIActivityIndicatorView *loadingIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhiteLarge];
+        loadingIndicator.frame = CGRectMake(0,25,loadingView.frame.size.width,loadingIndicator.frame.size.height);
+        
+        UILabel *loadingLabel = [[UILabel alloc] initWithFrame:CGRectMake(0,25+60,loadingView.frame.size.width,40)];
+        loadingLabel.numberOfLines = 2;
+        loadingLabel.textAlignment = NSTextAlignmentCenter;
+        loadingLabel.text = @"we're gathering the latest \nbeacon broadcasts for you";
+        loadingLabel.font = [UIFont fontWithName:@"QuicksandBold-Regular" size:17.0];
+        loadingLabel.textColor = [UIColor whiteColor];
+        loadingLabel.backgroundColor = [UIColor clearColor];
+        
+        
+        [loadingView addSubview:loadingIndicator];
+        [loadingView addSubview:loadingLabel];
+        [loadingIndicator startAnimating];
+        [feedTableView addSubview:loadingView];
+        
+    }
+
+}
+
+-(void)dismissLoadingView
+{
+    [loadingView removeFromSuperview];
+    loadingView = nil;
+}
+
+-(void)loadInitialNewsFeedData
+{
+    
+    newsFeedDataArray = nil;
+    [feedTableView reloadData];
+    
+<<<<<<< HEAD
+    
+    CGFloat height = 140;
+    CGFloat width = 250;
+    CGFloat topOffset = 120;
+    
+    UIView *loadingView = [[UIView alloc] initWithFrame:CGRectMake(feedTableView.frame.size.width/2-width/2,
+                                                                   topOffset,
+                                                                   width,
+                                                                   height)];
+    loadingView.layer.cornerRadius = 5;
+    loadingView.layer.backgroundColor = [[UIColor colorWithRed:0 green:0 blue:0 alpha:0.5] CGColor];
+    
+    UIActivityIndicatorView *loadingIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhiteLarge];
+    loadingIndicator.frame = CGRectMake(0,25,loadingView.frame.size.width,loadingIndicator.frame.size.height);
+    
+    UILabel *loadingLabel = [[UILabel alloc] initWithFrame:CGRectMake(0,25+60,loadingView.frame.size.width,40)];
+    loadingLabel.numberOfLines = 2;
+    loadingLabel.textAlignment = NSTextAlignmentCenter;
+    if (topButton.selected) {
+        
+        loadingLabel.text = @"We're learning what you like \n please check back later";
+
+    }else {
+        
+    loadingLabel.text = @"We're gathering for you the \nlatest beacon broadcasts";
+        
+    }
+    loadingLabel.font = [UIFont fontWithName:@"QuicksandBold-Regular" size:17.0];
+    loadingLabel.textColor = [UIColor whiteColor];
+    loadingLabel.backgroundColor = [UIColor clearColor];
+    
+    
+    [loadingView addSubview:loadingIndicator];
+    [loadingView addSubview:loadingLabel];
+    [feedTableView addSubview:loadingView];
+    [loadingIndicator startAnimating];
+    
+    [self requestNewsFeedWithOffset:0 limit:10 completionHandler:^(id response, RadiusError *error) {
+        
+=======
+    reachedBottom = NO;
+    isLoadingMore = YES;
+    totalRequested = 0;
+
+    [self removeLoadingMoreIndicator];
+    [self showLoadingView];
+        
+    [self requestNewsFeedWithOffset:0 limit:10 completionHandler:^(id response, RadiusError *error) {
+        
+        [self dismissLoadingView];
+        
+        if(error) {
+            // display error message
+            return;
+        }
+        
+        if([response count] < 10) reachedBottom = YES;
+        
+        newsFeedDataArray = [self eventsFromResponse:response];
+        
+        //Reload the table view and scroll it to top
+        [feedTableView reloadData];
+        if(self.newsFeedDataArray.count) {
+            [feedTableView scrollToRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0] atScrollPosition:UITableViewScrollPositionTop animated:NO];
+        }
+        
+        isLoadingMore = NO;
+>>>>>>> 000a519713c0cbf5b4b86c065f453870db30ef26
+
+            if(error) {
+                // display error message
+            }
+            
+            newsFeedDataArray = [self eventsFromResponse:response];
+            
+            //Reload the table view and scroll it to top
+            [feedTableView reloadData];
+            if(self.newsFeedDataArray.count) {
+                [feedTableView scrollToRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0] atScrollPosition:UITableViewScrollPositionTop animated:NO];
+            }
+
+            
+            dispatch_async(dispatch_get_main_queue(), ^{
+                // not sure if this must be done on the main thread, but just to be safe...
+                [loadingView removeFromSuperview];
+            });
+                
+    
+    }];
+
+}
+
+-(NSMutableArray *)eventsFromResponse:(NSArray *)responseArray
+{
+    NSMutableArray *events = [[NSMutableArray alloc] init];
+    for(NSDictionary *eventDict in responseArray) {
+        RadiusEvent *event = [RadiusEvent eventWithDictionary:eventDict];
+        if(event) {
+            [events addObject:event];
+        }
+    }
+    
+    return events;
+}
+
+-(void)loadMoreNewsFeedData
+{
+    // We can run into concurrency issues here with nonatomic boolean assign.  Maybe add a lock.
+    
+    if(isLoadingMore || reachedBottom) return;
+    
+    isLoadingMore = YES;
+    
+    [self addLoadingMoreIndicator];
+    
+    [self requestNewsFeedWithOffset:totalRequested limit:20 completionHandler:^(id response, RadiusError *error) {
+                
+        if(!error) {
+            if([response count]<20) reachedBottom = YES;
+            
+            [newsFeedDataArray addObjectsFromArray:[self eventsFromResponse:response]];
+            [feedTableView reloadData];
+            
+            feedTableView.scrollsToTop = YES;
+        }
+        
+        [self removeLoadingMoreIndicator];
+        isLoadingMore = NO;
+    }];
+}
+
+static const NSInteger LOADING_MORE_INDICATOR_TAG = 987592;
+
+- (void)addLoadingMoreIndicator
+{
+    if([feedTableView viewWithTag:LOADING_MORE_INDICATOR_TAG]) return;
+    
+    feedTableView.contentInset = UIEdgeInsetsMake(feedTableView.contentInset.top,
+                                                  feedTableView.contentInset.left,
+                                                  50,
+                                                  feedTableView.contentInset.right);
+    
+    UIActivityIndicatorView *aiv = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhite];
+    aiv.frame = CGRectMake(0, feedTableView.contentSize.height+15, 300, 20);
+    [aiv startAnimating];
+    aiv.tag = LOADING_MORE_INDICATOR_TAG;
+    [feedTableView addSubview:aiv];
+}
+
+- (void)removeLoadingMoreIndicator
+{
+    [[feedTableView viewWithTag:LOADING_MORE_INDICATOR_TAG] removeFromSuperview];
+    feedTableView.contentInset = UIEdgeInsetsMake(feedTableView.contentInset.top,
+                                                  feedTableView.contentInset.left,
+                                                  0,
+                                                  feedTableView.contentInset.right);
+}
+
+- (void)didReceiveMemoryWarning
+{
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+- (void) showNoLocationAlert {
+    float version = [[[UIDevice currentDevice] systemVersion] floatValue];
+    NSString *path = @"Settings";
+    if(version >= 4 && version < 6) {
+        path = @"Settings > Location Services";
+    } else if(version >= 6) {
+        path = @"Settings > Privacy > Location Services";
+    }
+    
+    NSString *message = [NSString stringWithFormat:@"To see activity from nearby beacons, enable location services for Radius in %@.",path];
+    PopupView *popupAlert = [[[NSBundle mainBundle]loadNibNamed:@"PopupView" owner:self options:nil]objectAtIndex:0];
+    [popupAlert setupWithDescriptionText:message andButtonText:@"OK"];
+    SlidingViewOptions options = CancelOnBackgroundPressed|AvoidKeyboard;
+    void (^cancelOrDoneBlock)() = ^{
+        // we must manually slide out the view out if we specify this block
+        [MFSlidingView slideOut];
+    };
+    [MFSlidingView slideView:popupAlert intoView:self.navigationController.view onScreenPosition:MiddleOfScreen offScreenPosition:MiddleOfScreen title:nil options:options doneBlock:cancelOrDoneBlock cancelBlock:cancelOrDoneBlock];
+}
+
+#pragma Methods for tab buttons
+-(void)setupTabButtons
+{
+    [allButton setBackgroundImage:[UIImage imageNamed:@"btn_nfp_all_highlight.png"] forState:UIControlStateSelected];
+    [allButton setBackgroundImage:[UIImage imageNamed:@"btn_nfp_all_highlight.png"] forState:UIControlStateHighlighted];
+    [followedButton setBackgroundImage:[UIImage imageNamed:@"btn_nfp_followed_highlight.png"] forState:UIControlStateSelected];
+    [followedButton setBackgroundImage:[UIImage imageNamed:@"btn_nfp_followed_highlight.png"] forState:UIControlStateHighlighted];
+    [nearbyButton setBackgroundImage:[UIImage imageNamed:@"btn_nfp_nearby_highlight.png"] forState:UIControlStateSelected];
+    [nearbyButton setBackgroundImage:[UIImage imageNamed:@"btn_nfp_nearby_highlight.png"] forState:UIControlStateHighlighted];
+    [topButton setBackgroundImage:[UIImage imageNamed:@"btn_nfp_top_highlight.png"] forState:UIControlStateSelected];
+    [topButton setBackgroundImage:[UIImage imageNamed:@"btn_nfp_top_highlight.png"] forState:UIControlStateHighlighted];
+}
+
+- (IBAction)allButtonPressed
+{
+    if(!locationManager.location) {
+        [self showNoLocationAlert];
+        return;
+    }
+    
+    [self setAllButtonSelected];
+}
+-(void)setAllButtonSelected
+{
+    currentFilter = @"all";
+    [self loadInitialNewsFeedData];
+    [allButton setSelected:YES];
+    [followedButton setSelected:NO];
+    [nearbyButton setSelected:NO];
+    [topButton setSelected:NO];
+}
+
+- (IBAction)followedButtonPressed
+{
+    [self setFollowedButtonSelected];
+}
+-(void)setFollowedButtonSelected
+{
+    currentFilter = @"followed";
+    [self loadInitialNewsFeedData];
+    [allButton setSelected:NO];
+    [followedButton setSelected:YES];
+    [nearbyButton setSelected:NO];
+    [topButton setSelected:NO];
+}
+
+- (IBAction)nearbyButtonPressed
+{
+    if(!locationManager.location) {
+        [self showNoLocationAlert];
+        return;
+    }
+    
+    [self setNearbyButtonSelected];
+}
+-(void)setNearbyButtonSelected
+{
+    currentFilter = @"nearby";
+    [self loadInitialNewsFeedData];
+    [allButton setSelected:NO];
+    [followedButton setSelected:NO];
+    [nearbyButton setSelected:YES];
+    [topButton setSelected:NO];
+}
+
+- (IBAction)topButtonPressed
+{
+    [self setTopButtonSelected];
+}
+-(void)setTopButtonSelected
+{
+    currentFilter = @"top";
+    [self loadInitialNewsFeedData];
+    [allButton setSelected:NO];
+    [followedButton setSelected:NO];
+    [nearbyButton setSelected:NO];
+    [topButton setSelected:YES];
+}
+
+
+#pragma FeedTableView delagate methods
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
+    return 1;
+}
+
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    RadiusEvent *event = [newsFeedDataArray objectAtIndex:indexPath.row];
+    return [event newsFeedCellHeight];
+}
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
+{
+    return [newsFeedDataArray count];
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    
+    RadiusEvent *event = [newsFeedDataArray objectAtIndex:indexPath.row];
+    
+    // Get the cell for this particular type of event
+    FeedCell *cell = [event newsFeedCellForTableView:tableView imageCache:cache];
+    
+    // Common setup for all feed cells
+    DateAndTimeHelper *dateHelper = [[DateAndTimeHelper alloc] init];
+    NSDate *postDate = [NSDate dateWithTimeIntervalSince1970:event.timestamp];
+    NSString *dateString = [dateHelper timeIntervalWithStartDate:postDate withEndDate:[NSDate date]]; //[NSDate date] gets the current date
+    [cell.timePostedLabel setText:dateString];
+
+    //Calculate distance from user's current location to the Beacon
+    CLLocation *locA = [[CLLocation alloc] initWithLatitude:locationManager.location.coordinate.latitude longitude:locationManager.location.coordinate.longitude];
+    CLLocation *locB = [[CLLocation alloc] initWithLatitude:[[[event.beaconInfo objectForKey:@"center"] objectAtIndex:0] doubleValue] longitude:[[[event.beaconInfo objectForKey:@"center"] objectAtIndex:1] doubleValue]];
+    CLLocationDistance distance = [locA distanceFromLocation:locB];
+    //Distance in Meters
+    //1 meter == 100 centimeter
+    //1 meter == 3.280 feet
+    //1 meter == 10.76 square feet
+    //Max 1 decimal place for display purposes
+    NSString *milesString = [NSString stringWithFormat:@"%f", (distance*3.28/5280)];
+    NSRange rangeOfDecimal = [milesString rangeOfString:@"."];
+    milesString = [milesString substringToIndex:rangeOfDecimal.location+2];
+    NSString *distString = [NSString stringWithFormat:@"%@ mi", milesString];
+    [cell.distanceLabel setText:distString];
+
+    [cell.beaconNameLabel setText:[event.beaconInfo objectForKey: @"name"]];
+    int numFollowers = [[event.beaconInfo objectForKey: @"num_followers"] integerValue];
+    if (numFollowers == 1)
+    {
+        [cell.numberOfFollowersLabel setText:@"1 follower"];
+    }
+    else
+    {
+    [cell.numberOfFollowersLabel setText: [NSString stringWithFormat:@"%d followers", numFollowers]];
+    }
+                
+    return cell;
+    
+
+}
+
+-(void) tableView: (UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    
+    RadiusEvent *event = [newsFeedDataArray objectAtIndex:indexPath.row];
+    
+    UIViewController *next = [event linkViewController];
+    
+    if(next) {
+        [self.navigationController pushViewController:next animated:YES];
+    }
+    
+    return;    
+}
+
+- (void)scrollViewDidScroll:(UIScrollView *)scrollView
+{
+    CGPoint offset = scrollView.contentOffset;
+    CGRect bounds = scrollView.bounds;
+    CGSize size = scrollView.contentSize;
+    UIEdgeInsets inset = scrollView.contentInset;
+    float y = offset.y + bounds.size.height - inset.bottom;
+    float h = size.height;
+    
+    float reload_distance = -600;
+    if(y > h + reload_distance) {        
+        [self loadMoreNewsFeedData];
+    }
+}
+
+-(void)viewWillDisappear:(BOOL)animated {
+    [locationManager stopUpdatingLocation];
+}
+
+
+
+@end
